@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <process.h>
+
 
 void appendLinkList(RecordNode *head, ReaderLink *reader) {
     // 插入到表尾部
@@ -56,7 +58,7 @@ void ChangeReader(ReaderLink *changedReader, Key key, enum Field f) {
         case CODE:
         case NAME:
         case DEPT: {
-            char *filed = f + 1 ? (f - 1 ? changedReader->Code : changedReader->Dept) : changedReader->Name;
+            char *filed = f + 1 ? (f - 1 ? changedReader->Name : changedReader->Dept) : changedReader->Code;
             size_t len = strlen((char*)realKey);
             strncpy(filed, (char *)realKey, len+1);
             break;
@@ -102,10 +104,36 @@ void SaveReader(RecordNode *head) {
 
 void BrowserReader(RecordNode *head) {
     ReaderLink *current = head->node;
-    int count = 1;
+    ReaderLink *history[10] = {head->node};
+    int count = 0, count1 = 1;
     while (current) {
-        printf("%4d %10s %10s %4s %15s %4d\n", count++, current->Code, current->Name, current->Sex, current->Dept, current->Tag);
-        current = current->next;
+        fprintf(stdout, "%-4d %-10s %-10s %-4s %-15s %-4d\n", count++, current->Code, current->Name, current->Sex, current->Dept, current->Tag);
+        if (count % 10 == 0) {
+            printf("%-10s %-10s %-10s\n", "q退出", "n下一页", "p前一页");
+            char c;
+            scanf("%c", &c);
+            while (c != 'q') {
+                if (c == 'n') {
+                    history[count1++] = current->next;
+                    current  = current->next;
+                    break;
+                }
+                else if (c == 'p' && count1 != 1) {
+                    current = history[count1-- - 2];
+                    count -= 10;
+                    break;
+                } else if (c == 'p') {
+                    current = history[0];
+                    count -= 10;
+                    break;
+                }
+                scanf("%c", &c);
+            }
+            if (c == 'q')
+                return;
+        }
+        else
+            current = current->next;
     }
 }
 
@@ -161,10 +189,8 @@ RecordNode *FindReader_Name(RecordNode *head, char * key) {
 }
 
 int browserMenu(RecordNode *head) {
-    printf("%4s %10s %10s %4s %15s %4s\n", "序号", "证件号", "姓名", "性别", "学院", "标签");
+    printf("%-4s %-10s %-10s %-4s %-15s %-4s\n", "序号", "证件号", "姓名", "性别", "学院", "标签");
     BrowserReader(head);
-    printf("返回上一级输入q:");
-    while (getchar() != 'q');
     return 1;
 }
 
@@ -177,11 +203,11 @@ int lostMenu(RecordNode *head) {
     RecordNode* node = getReader(head, key, CODE);
     if (node == NULL) {
         printf("未找到该证件号!输入q退出 c继续\n");
-        getchar();
-        int c = getchar();
+        char c;
+        scanf(" %c", &c);
         if (c == 'q')
             return -1;
-        while (c != 'c') c = getchar();
+        while (c != 'c') scanf("%c", &c);
     } else {
         LostReader(node->node);
         printf("挂失成功!输入任意键退出\n");
@@ -203,12 +229,12 @@ int addMenu(RecordNode *head) {
         InputReader(head);
         SaveReader(head);
         printf("退出请输入q，继续请输入c\n");
-        getchar();
-        int c = getchar();
+        char c;
+        scanf(" %c", &c);
         if (c == 'q')
             return -1;
         while (c != 'c')
-            c = getchar();
+            scanf("%c", &c);
     }
     return 1;
 }
@@ -218,21 +244,21 @@ int searchMenu(RecordNode *head) {
         printf("请输入查询的字段:0.名称 1.证件号\n");
         int choice;
         scanf("%d", &choice);
-        RecordNode *(*fun)(RecordNode *, Key) = choice ? FindReader_Code : FindReader_Name;
-        Key key;
-        scanf("%s", key.s);
-        RecordNode *node = fun(head, key);
+        RecordNode *(*fun)(RecordNode *, char*) = choice ? FindReader_Code : FindReader_Name;
+        char s[100];
+        scanf("%s", s);
+        RecordNode *node = fun(head, s);
         if (node == NULL) {
             printf("未找到对象!输入q退出 c继续\n");
-            getchar();
-            int c = getchar();
+            char c;
+            scanf(" %c", &c);
             if (c == 'q')
                 return -1;
-            while (c != 'c') c = getchar();
+            while (c != 'c') scanf("%c", &c);
         } else {
             ReaderLink *result = node->node;
-            printf("%10s %10s %4s %15s %4s\n", "证件号", "姓名", "性别", "学院", "标签");
-            printf("%10s %10s %4s %15s %4d\n", result->Code, result->Name, result->Sex, result->Dept, result->Tag);
+            printf("%-10s %-10s %-4s %-15s %-4s\n", "证件号", "姓名", "性别", "学院", "标签");
+            printf("%-10s %-10s %-4s %-15s %-4d\n", result->Code, result->Name, result->Sex, result->Dept, result->Tag);
             printf("输入q退出 c继续\n");
             free(node);
             getchar();
@@ -254,8 +280,9 @@ int alterMenu(RecordNode *head) {
         RecordNode *node = getReader(head, key, CODE);
         if (node == NULL) {
             printf("没有查找到读者信息！请重试（退出输入q）\n");
-            getchar();
-            if (getchar() == 'q')
+            char c;
+            scanf(" %c", &c);
+            if (c == 'q')
                 return -1;
         } else {
             printf("请输入要修改的部分:\n");
@@ -280,12 +307,12 @@ int alterMenu(RecordNode *head) {
             ChangeReader(node->node, newValue, f);
             // 写回
             AlterReader(head, node->node);
-            printf("继续修改 c 退出 q");
-            getchar();
-            int c = getchar();
+            printf("继续修改 c 退出 q\n");
+            char c;
+            scanf(" %c", &c);
             if (c == 'q')
                 break;
-            while (c != 'c') c = getchar();
+            while (c != 'c') scanf(" %c", &c);
         }
     }
     return 1;
@@ -307,16 +334,17 @@ void readerMenu() {
         printf("                                         **********************************************\n");
         printf("                                                             读者管理菜单\n");
         printf("                                         **********************************************\n");
-        printf("                                         *                   1.浏览所有读者             *\n");
-        printf("                                         *                   2.增加读者                 *\n");
-        printf("                                         *                   3.查询读者                 *\n");
-        printf("                                         *                   4.修改读者                 *\n");
-        printf("                                         *                   5.证件挂失                 *\n");
-        printf("                                         *                   0.返回上级                 *\n");
+        printf("                                         *                   1.浏览所有读者            *\n");
+        printf("                                         *                   2.增加读者                *\n");
+        printf("                                         *                   3.查询读者                *\n");
+        printf("                                         *                   4.修改读者                *\n");
+        printf("                                         *                   5.证件挂失                *\n");
+        printf("                                         *                   0.返回上级                *\n");
         printf("                                         ***********************************************\n");
         printf("请输入你的选择！0~5\n");
         scanf("%d", &choice);
         state = menus[choice](head);
+        system("cls");
     }
     ReaderLink *current = head->node;
     while (current) {
